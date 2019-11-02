@@ -1,1 +1,1 @@
-# Technical-Neuroal-Network
+# Technical-Neural-Network
