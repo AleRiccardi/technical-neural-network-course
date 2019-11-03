@@ -1,3 +1,4 @@
+import random
 from abc import abstractmethod
 
 import numpy as np
@@ -41,7 +42,7 @@ class Layer(object):
         self.layer_above = None
         self.layer_below = None
         self.biases = np.random.uniform(-2, 2, size=(n_outputs,))
-        self.weights = np.random.uniform(-2, 2, size=(n_inputs +1 , n_outputs))
+        self.weights = np.random.uniform(-2, 2, size=(n_inputs, n_outputs))
         self.learning_rate = learning_rate
         self.transfer = transfer
         self.final = final
@@ -79,6 +80,7 @@ class Layer(object):
         return self.output
 
     def apply_delta(self):
+        self.biases = self.learning_rate * self.sigma
         self.weights += self.delta
 
 
@@ -94,16 +96,23 @@ class Hidden(Layer):
         super().__init__(n_inputs, n_outputs, learning_rate, transfer)
 
     def backward(self, teacher=None, pattern=None):
-        weights_T = self.layer_below.weights.T
-        self.sigma = np.dot(self.layer_below.sigma, weights_T) * derivative(self.net, self.transfer)
-        # delta W = n * sigma * out_above
-        if self.layer_above:
-            shape = self.layer_above.output.shape
-            output_T = np.reshape(self.layer_above.output, (shape[0], 1))
+        # sigma_h = (sum(sigma_k * w_hk) * f'(net_h)
+        self.sigma = (np.dot(
+            self.layer_below.sigma,
+            self.layer_below.weights.T
+        ) * derivative(self.net, self.transfer))
+
+        # retrieve out_g
+        if not self.layer_above:
+            # first layer = patterns
+            out_g = pattern.T
         else:
-            shape = pattern.shape
-            output_T = np.reshape(pattern, (shape[0], 1))
-        self.delta = self.learning_rate * np.dot(output_T, self.sigma)
+            # out_g from layer above
+            out_g = self.layer_above.output
+            out_g = np.reshape(out_g, (out_g.shape[1], 1))
+
+        # delta_W = n * sigma * out_g
+        self.delta = (self.learning_rate * np.dot(out_g, self.sigma))
 
 
 class Output(Layer):
@@ -118,12 +127,15 @@ class Output(Layer):
         super().__init__(n_inputs, n_outputs, learning_rate, transfer)
 
     def backward(self, teacher=None, pattern=None):
+        # sigma_m = ((y'm - ym) * f'(net_m)
         self.sigma = ((teacher - self.output) * derivative(self.net, self.transfer))
-        self.sigma = np.reshape(self.sigma, (1, self.sigma.shape[0]))
-        # delta W = n * sigma * out_above
-        shape = self.layer_above.output.shape
-        output_T = np.reshape(self.layer_above.output, (shape[0], 1))
-        self.delta = self.learning_rate * np.dot(output_T, self.sigma)
+
+        # retrieve out_h
+        out_h = self.layer_above.output
+        out_h = np.reshape(out_h, (out_h.shape[1], 1))  # shape[0]
+
+        # delta_W = n * sigma_m * out_h
+        self.delta = self.learning_rate * np.dot(out_h, self.sigma)
 
 
 class Network(object):
@@ -131,11 +143,11 @@ class Network(object):
     Multi Layer Perzeptron.
     """
 
-    def __init__(self, epochs=50):
+    def __init__(self, epochs=50, seed=999):
         """
         Initialize the MLP.
         """
-        np.random.seed(999)
+        np.random.seed(seed)
 
         self.X = None
         self.y = None
@@ -163,8 +175,9 @@ class Network(object):
         self.y = y
 
         for ep in range(1, self.epochs + 1):
-            print('Epoch n: {}'.format(ep))
+            error_sum = 0
             for pattern, teacher in zip(X, y):
+                pattern = np.reshape(pattern, (1, pattern.shape[0]))
                 # forward computation
                 output = None
                 for layer in self.layers:
@@ -177,13 +190,34 @@ class Network(object):
                 # apply deltas
                 for layer in self.layers:
                     layer.apply_delta()
-                self.compute_error(teacher, output)
 
-    def compute_error(self, teacher, output):
-        self.errors.append(np.sum((teacher - output) ** 2) * (1 / 2))
+                error_sum += self.compute_error(teacher, output)
+            self.errors.append(error_sum)
+            print('Epoch ({})\t||\tloss: {:.4f}'.format(ep, self.errors[-1]))
+        self.save_errors()
+
+    @staticmethod
+    def compute_error(teacher, output):
+        error = np.sum((teacher - output) ** 2)
+        return error
 
     def predict(self, X):
-        pass
+        outputs = []
+        for pattern in X:
+            # forward computation
+            pattern = np.reshape(pattern, (1, pattern.shape[0]))
+            output = None
+            for layer in self.layers:
+                output = layer.forward(pattern)
+            outputs.append(output[0, :])
+        return np.array(outputs)
+
+    def save_errors(self):
+        f = open('learning.curve', 'w')
+        print('#\tX\tY', file=f)
+        for x, y in enumerate(self.errors):
+            print('\t{}\t{}'.format(x, y), file=f)
+        f.close()
 
 
 def read_dat(name):
@@ -214,15 +248,45 @@ def read_dat(name):
     return X, y
 
 
+def cross_validation(X, y, split=0.75):
+    assert X.shape[0] == y.shape[0]
+    size = X.shape[0]
+    sep = int(split * size)
+
+    for i in range(size):
+        j = random.randint(0, size - 1)
+        x_tmp = X[i, :]
+        X[i, :] = X[j, :]
+        X[j, :] = x_tmp
+        y_tmp = y[i, :]
+        y[i, :] = y[j, :]
+        y[j, :] = y_tmp
+    return X[:sep, :], y[:sep, :], X[sep:, :], y[sep:, :]
+
+
 if __name__ == "__main__":
     # read dataset
-    X_train, y_train = read_dat('PA-B-train-04.dat')
-    # Initialize the MLP
-    print(X_train.shape)
+    X, y = read_dat('PA-B-train-04.dat')
+    X_train, y_train, X_val, y_val = cross_validation(X, y, split=0.80)
 
-    net = Network()
-    net.add_layer(Hidden(X_train.shape[1], 30))
-    net.add_layer(Output(30, y_train.shape[1]))
+    # initialization of the network
+    # and creating the layers
+    net = Network(epochs=200, seed=20)
+    net.add_layer(Hidden(X_train.shape[1], 15, learning_rate=0.01, transfer=T_TANH))
+    net.add_layer(Hidden(15, 10, learning_rate=0.08, transfer=T_TANH))
+    net.add_layer(Hidden(10, 5, learning_rate=0.04, transfer=T_TANH))
+    net.add_layer(Output(5, y_train.shape[1], learning_rate=0.005, transfer=T_TANH))
     net.end_layers()
 
-    net.fit(X_train, y_train)
+    # training the network
+    net.fit(X_train[:, :], y_train[:, :])
+
+    # print random prediction on validation data
+    print(net.predict(X_val[5:20, :]).T)
+    print(y_val[5:20, :].T)
+
+    # plot errors
+    plt.plot(net.errors)
+    plt.ylabel('Loss')
+    plt.xlabel('Epochs')
+    plt.show()
