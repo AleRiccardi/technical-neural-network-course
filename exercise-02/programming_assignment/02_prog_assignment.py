@@ -13,7 +13,8 @@ class Perzeptron(object):
         self.epochs = epochs
 
     def train(self, X_train, y_train):
-        """Train the perzeptron given as input
+        """
+        Train the perzeptron given as input
         a matrix of values (X) and an array of
         desired output (y).
         """
