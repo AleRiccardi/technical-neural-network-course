@@ -261,6 +261,7 @@ def cross_validation(X, y, split=0.75):
         y_tmp = y[i, :]
         y[i, :] = y[j, :]
         y[j, :] = y_tmp
+        
     return X[:sep, :], y[:sep, :], X[sep:, :], y[sep:, :]
 
 
