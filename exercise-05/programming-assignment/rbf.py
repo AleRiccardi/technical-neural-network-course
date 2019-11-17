@@ -72,17 +72,18 @@ class RBFlayer:
     def find_sizes(self):
         # fill in distance matrix
         for i in range(self.num_neurons):
-            for j in range(i+1, self.num_neurons):
+            for j in range(i + 1, self.num_neurons):
                 if i == j:
                     self.distances_matrix[i, j] = 0
                 else:
-                    self.distances_matrix[i, j] = self.distances_matrix[j, i] = euclidian_distance(self.centers[i], self.centers[j])
+                    self.distances_matrix[i, j] = self.distances_matrix[j, i] = euclidian_distance(self.centers[i],
+                                                                                                   self.centers[j])
 
         # set sizes
         num_closest = math.ceil(self.num_neurons * self.closest_percent)
         sorted_distances = np.sort(self.distances_matrix)
         for i, c in enumerate(self.centers):
-            self.sizes[i] = np.mean(sorted_distances[i, 1:num_closest+1])
+            self.sizes[i] = np.mean(sorted_distances[i, 1:num_closest + 1])
 
     def forward(self, X):
         distances = []
@@ -92,6 +93,34 @@ class RBFlayer:
         distances /= 2 * np.square(self.sizes)
         distances = np.exp(-distances)
         return distances
+
+
+class OutLayer:
+
+    def __init__(self,
+                 n_rbf,
+                 n_outputs,
+                 learning_rate=0.01):
+        self.net = None
+        self.out_rbf = None
+        self.output = None
+        self.sigma = None
+        self.weights = np.random.uniform(-.5, .5, size=(n_rbf, n_outputs))
+        self.learning_rate = learning_rate
+
+    def forward(self, R):
+        """
+        Forward propagation.
+        :param X:
+        :return:
+        """
+        self.out_rbf = R
+        self.output = np.dot(R * self.weights)
+        return self.output
+
+    def adjust_weights(self, teacher):
+        delta = self.learning_rate * np.dot(self.out_rbf, (teacher - self.out_rbf))
+        self.weights *= delta
 
 
 def read_dat(name):
