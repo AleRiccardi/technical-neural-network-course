@@ -21,7 +21,7 @@ class Network(object):
     Radial Basis Function network
     """
 
-    def __init__(self, epochs=50, seed=999):
+    def __init__(self, num_rbf, epochs=50, seed=999):
         """
         Initialize the network
         """
@@ -29,45 +29,89 @@ class Network(object):
 
         self.X = None
         self.y = None
-        self.errors = []
+        self.num_rbf = num_rbf
+        self.errors_train = []
+        self.errors_val = []
         self.rbf_layer = None
         self.output_layer = None
         self.epochs = epochs
 
-    def fit(self, X, y):
-        pass
+    def fit(self, X_train, y_train, X_val, y_val):
+        self.rbf_layer = RBFlayer(self.num_rbf, X.shape[1])
+        self.output_layer = OutLayer(self.num_rbf, y.shape[1])
+
+        self.rbf_layer.find_centers(X)
+        self.rbf_layer.find_sizes()
+        # loop per every epochs and pattern
+        for ep in range(1, self.epochs + 1):
+            errors_train = []
+            for pattern, teacher in zip(X_train, y_train):
+                # rbf layer
+                R_vect = self.rbf_layer.forward(pattern)
+                output = self.output_layer.forward(R_vect)
+                self.output_layer.adjust_weights(teacher)
+                loss = self.mean_squared_error(teacher, output)
+                errors_train.append(loss)
+            self.errors_train.append(sum(errors_train) / len(errors_train))
+
+            # validation
+            errors_val = []
+            for pattern, teacher in zip(X_val, y_val):
+                R_vect = self.rbf_layer.forward(pattern)
+                output = self.output_layer.forward(R_vect)
+                loss = self.mean_squared_error(teacher, output)
+                errors_val.append(loss)
+            self.errors_val.append(sum(errors_val) / len(errors_val))
+
+            print('Epoch ({})\t||\ttrain loss: {:.4f}\t||\tval loss: {:.4f}'.format(ep, self.errors_train[-1],
+                                                                                    self.errors_val[-1]))
+        self.save_errors()
 
     @staticmethod
-    def compute_error(teacher, output):
+    def mean_squared_error(teacher, output):
         error = np.sum((teacher - output) ** 2)
         return error
 
     def predict(self, X):
-        pass
+        outputs = []
+        for pattern in X:
+            # forward computation
+            R_vect = self.rbf_layer.forward(pattern)
+            output = self.output_layer.forward(R_vect)
+
+            outputs.append(output)
+        return np.array(outputs)
 
     def save_errors(self):
         f = open('learning.curve', 'w')
         print('#\tX\tY', file=f)
-        for x, y in enumerate(self.errors):
+        for x, y in enumerate(self.errors_val):
             print('\t{}\t{}'.format(x, y), file=f)
         f.close()
 
 
 class RBFlayer:
     def __init__(self, num_neurons, len_input, closest_percent=0.1):
-        self.centers = np.array((num_neurons, len_input))
-        self.sizes = np.array((num_neurons,))
+        self.centers = np.zeros((num_neurons, len_input))
+        self.sizes = np.zeros((num_neurons,))
         self.num_neurons = num_neurons
-        self.distances_matrix = np.array((num_neurons, num_neurons))
+        self.distances_matrix = np.zeros((num_neurons, num_neurons))
         # how many closest centers to consider for eaech center
         # when computing its radius
         self.closest_percent = closest_percent
 
     def find_centers(self, all_inputs):
+        """
+        Sets self.centers with centers found with K-means clustering algorithm
+        the number of centers is the number of neurons.
+        :param all_inputs:
+        :return:
+        """
         # find center vectors
         kmeans = KMeans(n_clusters=self.num_neurons)
         kmeans.fit(all_inputs)
         self.centers = kmeans.cluster_centers_
+
 
     def find_sizes(self):
         # fill in distance matrix
@@ -76,8 +120,11 @@ class RBFlayer:
                 if i == j:
                     self.distances_matrix[i, j] = 0
                 else:
-                    self.distances_matrix[i, j] = self.distances_matrix[j, i] = euclidian_distance(self.centers[i],
-                                                                                                   self.centers[j])
+                    a = self.centers[i, :]
+                    b = self.centers[j, :]
+                    dist = euclidian_distance(a, b)
+                    self.distances_matrix[i, j] = dist
+                    self.distances_matrix[j, i] = dist
 
         # set sizes
         num_closest = math.ceil(self.num_neurons * self.closest_percent)
@@ -89,7 +136,7 @@ class RBFlayer:
         distances = []
         for i in range(self.num_neurons):
             distances.append(euclidian_distance(self.centers[i], X))
-        distances = np.array(distances, dtype=float)
+        distances = np.array([distances], dtype=float)
         distances /= 2 * np.square(self.sizes)
         distances = np.exp(-distances)
         return distances
@@ -115,12 +162,13 @@ class OutLayer:
         :return:
         """
         self.out_rbf = R
-        self.output = np.dot(R * self.weights)
+        self.output = np.dot(R, self.weights)
         return self.output
 
     def adjust_weights(self, teacher):
-        delta = self.learning_rate * np.dot(self.out_rbf, (teacher - self.out_rbf))
-        self.weights *= delta
+        out_sub = (teacher - self.output)
+        delta = self.learning_rate * np.dot(self.out_rbf.T, out_sub)
+        self.weights += delta
 
 
 def read_dat(name):
@@ -151,7 +199,7 @@ def read_dat(name):
     return X, y
 
 
-def cross_validation(X, y, split=0.75):
+def train_test_split(X, y, split=0.75):
     assert X.shape[0] == y.shape[0]
     size = X.shape[0]
     sep = int(split * size)
@@ -171,7 +219,22 @@ def cross_validation(X, y, split=0.75):
 if __name__ == "__main__":
     # read dataset
     X, y = read_dat('PA-B-train-04.dat')
-    X_train, y_train, X_val, y_val = cross_validation(X, y, split=0.80)
+    X_train, y_train, X_val, y_val = train_test_split(X, y, split=.8)
 
     # initialization of the network
     # and creating the layers
+    net = Network(num_rbf=50, epochs=100, seed=10)
+    net.fit(X_train, y_train, X_val, y_val)
+
+    # print random prediction on validation data
+    print('Test prediction:')
+    prediction = net.predict(X_val)
+    for i, (y_pred, y_val) in enumerate(zip(prediction, y_val)):
+        print('Pattern ({}) || prediction: {:.5f}, actual value: {:.5f}'.format(i, y_pred[0, 0], y_val[0]))
+
+    # plot errors
+    plt.plot(net.errors_train)
+    plt.plot(net.errors_val)
+    plt.ylabel('Loss')
+    plt.xlabel('Epochs')
+    plt.show()
