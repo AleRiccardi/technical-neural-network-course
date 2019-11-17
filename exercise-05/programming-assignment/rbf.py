@@ -8,10 +8,16 @@ import matplotlib.pyplot as plt
 
 
 def euclidian_distance(a, b):
+    """
+    Calculating Euclidian distance between 2 vectors
+    :param a: 1st vector
+    :param b: 2nd vector
+    :return:
+    """
     assert len(a) == len(b)
     d = 0
-    for i in range(len(a)):
-        d += (a[i] - b[i]) ** 2
+    for feature in range(len(a)):
+        d += (a[feature] - b[feature]) ** 2
 
     return d ** 0.5
 
@@ -96,7 +102,7 @@ class RBFlayer:
         self.sizes = np.zeros((num_neurons,))
         self.num_neurons = num_neurons
         self.distances_matrix = np.zeros((num_neurons, num_neurons))
-        # how many closest centers to consider for eaech center
+        # how many closest centers to consider for each center
         # when computing its radius
         self.closest_percent = closest_percent
 
@@ -107,11 +113,10 @@ class RBFlayer:
         :param all_inputs:
         :return:
         """
-        # find center vectors
+        # find center vectors with Kmeans clustering method
         kmeans = KMeans(n_clusters=self.num_neurons)
         kmeans.fit(all_inputs)
         self.centers = kmeans.cluster_centers_
-
 
     def find_sizes(self):
         # fill in distance matrix
@@ -126,16 +131,28 @@ class RBFlayer:
                     self.distances_matrix[i, j] = dist
                     self.distances_matrix[j, i] = dist
 
-        # set sizes
+        # set size for each center to the mean of the distances
+        # to 'closest_percent' of the closest centers
         num_closest = math.ceil(self.num_neurons * self.closest_percent)
+        # sorting each row of the distance matrix
         sorted_distances = np.sort(self.distances_matrix)
         for i, c in enumerate(self.centers):
+            # and taking 'num_closest' distances starting from the second one
+            # because first is 0 distance between a center and itself
             self.sizes[i] = np.mean(sorted_distances[i, 1:num_closest + 1])
 
     def forward(self, X):
+        """
+        calculate the output of the RBF layer
+        :param X: input pattern
+        :return:
+        """
         distances = []
+        # get distances from centers
         for i in range(self.num_neurons):
             distances.append(euclidian_distance(self.centers[i], X))
+
+        # apply the rest of the formula
         distances = np.array([distances], dtype=float)
         distances /= 2 * np.square(self.sizes)
         distances = np.exp(-distances)
@@ -152,6 +169,7 @@ class OutLayer:
         self.out_rbf = None
         self.output = None
         self.sigma = None
+        # initialize weights randomly
         self.weights = np.random.uniform(-.5, .5, size=(n_rbf, n_outputs))
         self.learning_rate = learning_rate
 
@@ -167,7 +185,9 @@ class OutLayer:
 
     def adjust_weights(self, teacher):
         out_sub = (teacher - self.output)
+        # calculate weight changes with delta rule
         delta = self.learning_rate * np.dot(self.out_rbf.T, out_sub)
+        # apply weight changes
         self.weights += delta
 
 
@@ -219,20 +239,23 @@ def train_test_split(X, y, split=0.75):
 if __name__ == "__main__":
     # read dataset
     X, y = read_dat('PA-B-train-04.dat')
+    # take 'split' percent of the data
+    # and further split it to train and validation samples
     X_train, y_train, X_val, y_val = train_test_split(X, y, split=.8)
 
-    # initialization of the network
-    # and creating the layers
+    # initialize the network
     net = Network(num_rbf=50, epochs=100, seed=10)
+    # train and validate each epoch
     net.fit(X_train, y_train, X_val, y_val)
 
-    # print random prediction on validation data
+    # test the network by predicting output from the unseen data
     print('Test prediction:')
     prediction = net.predict(X_val)
+    # print predicted and true values side bt side
     for i, (y_pred, y_val) in enumerate(zip(prediction, y_val)):
         print('Pattern ({}) || prediction: {:.5f}, actual value: {:.5f}'.format(i, y_pred[0, 0], y_val[0]))
 
-    # plot errors
+    # plot errors for training and validation
     plt.plot(net.errors_train)
     plt.plot(net.errors_val)
     plt.ylabel('Loss')
