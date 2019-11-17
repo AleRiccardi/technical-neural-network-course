@@ -1,25 +1,37 @@
 import random
 from abc import abstractmethod
+import math
 
+from sklearn.cluster import KMeans
 import numpy as np
 import matplotlib.pyplot as plt
 
 
+def euclidian_distance(a, b):
+    assert len(a) == len(b)
+    d = 0
+    for i in range(len(a)):
+        d += (a[i] - b[i]) ** 2
+
+    return d ** 0.5
+
+
 class Network(object):
     """
-    Multi Layer Perzeptron.
+    Radial Basis Function network
     """
 
     def __init__(self, epochs=50, seed=999):
         """
-        Initialize the MLP.
+        Initialize the network
         """
         np.random.seed(seed)
 
         self.X = None
         self.y = None
         self.errors = []
-        self.layer = []
+        self.rbf_layer = None
+        self.output_layer = None
         self.epochs = epochs
 
     def fit(self, X, y):
@@ -39,6 +51,47 @@ class Network(object):
         for x, y in enumerate(self.errors):
             print('\t{}\t{}'.format(x, y), file=f)
         f.close()
+
+
+class RBFlayer:
+    def __init__(self, num_neurons, len_input, closest_percent=0.1):
+        self.centers = np.array((num_neurons, len_input))
+        self.sizes = np.array((num_neurons,))
+        self.num_neurons = num_neurons
+        self.distances_matrix = np.array((num_neurons, num_neurons))
+        # how many closest centers to consider for eaech center
+        # when computing its radius
+        self.closest_percent = closest_percent
+
+    def find_centers(self, all_inputs):
+        # find center vectors
+        kmeans = KMeans(n_clusters=self.num_neurons)
+        kmeans.fit(all_inputs)
+        self.centers = kmeans.cluster_centers_
+
+    def find_sizes(self):
+        # fill in distance matrix
+        for i in range(self.num_neurons):
+            for j in range(i+1, self.num_neurons):
+                if i == j:
+                    self.distances_matrix[i, j] = 0
+                else:
+                    self.distances_matrix[i, j] = self.distances_matrix[j, i] = euclidian_distance(self.centers[i], self.centers[j])
+
+        # set sizes
+        num_closest = math.ceil(self.num_neurons * self.closest_percent)
+        sorted_distances = np.sort(self.distances_matrix)
+        for i, c in enumerate(self.centers):
+            self.sizes[i] = np.mean(sorted_distances[i, 1:num_closest+1])
+
+    def forward(self, X):
+        distances = []
+        for i in range(self.num_neurons):
+            distances.append(euclidian_distance(self.centers[i], X))
+        distances = np.array(distances, dtype=float)
+        distances /= 2 * np.square(self.sizes)
+        distances = np.exp(-distances)
+        return distances
 
 
 def read_dat(name):
