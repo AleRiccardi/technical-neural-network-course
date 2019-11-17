@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class Outlayer:
+class OutLayer:
 
     def __init__(self,
                  n_rbf,
