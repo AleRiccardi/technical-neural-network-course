@@ -5,6 +5,34 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+class Outlayer:
+
+    def __init__(self,
+                 n_rbf,
+                 n_outputs,
+                 learning_rate=0.01):
+        self.net = None
+        self.out_rbf = None
+        self.output = None
+        self.sigma = None
+        self.weights = np.random.uniform(-.5, .5, size=(n_rbf, n_outputs))
+        self.learning_rate = learning_rate
+
+    def forward(self, R):
+        """
+        Forward propagation.
+        :param X:
+        :return:
+        """
+        self.out_rbf = R
+        self.output = np.dot(R * self.weights)
+        return self.output
+
+    def adjust_weights(self, teacher):
+        delta = self.learning_rate * np.dot(self.out_rbf, (teacher - self.out_rbf))
+        self.weights *= delta
+
+
 class Network(object):
     """
     Multi Layer Perzeptron.
