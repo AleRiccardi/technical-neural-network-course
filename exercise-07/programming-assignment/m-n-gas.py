@@ -117,27 +117,25 @@ def read_dat(name):
     return X, y
 
 
-def train_test_split(X, y, split=0.75):
-    assert X.shape[0] == y.shape[0]
-    size = X.shape[0]
-    sep = int(split * size)
+def generate_2_areas():
+    """
+    Generate 2 circular non overlapping areas.
+    :return:
+    """
+    # return X patterns
+    return None
 
-    for i in range(size):
-        j = random.randint(0, size - 1)
-        x_tmp = X[i, :]
-        X[i, :] = X[j, :]
-        X[j, :] = x_tmp
-        y_tmp = y[i, :]
-        y[i, :] = y[j, :]
-        y[j, :] = y_tmp
 
-    return X[:sep, :], y[:sep, :], X[sep:, :], y[sep:, :]
+def generate_3_areas():
+    """
+    Generate 3 circular non overlapping areas.
+    :return:
+    """
+    # return X patterns
+    return None
+
 
 
 if __name__ == '__main__':
-    X, y = read_dat('PA-D-train.dat.txt')
-    # take 'split' percent of the data
-    # and further split it to train and validation samples
-    X_train, y_train, X_val, y_val = train_test_split(X, y, split=.8)
-
-    m_gas = MNGas(4, (50, 100), X_train)
+    X, _ = read_dat('PA-D-train.dat.txt')
+    m_gas = MNGas(4, (50, 100), X)
