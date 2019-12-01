@@ -112,7 +112,6 @@ class RBFlayer:
         kmeans.fit(all_inputs)
         self.centers = kmeans.cluster_centers_
 
-
     def find_sizes(self):
         # fill in distance matrix
         for i in range(self.num_neurons):
