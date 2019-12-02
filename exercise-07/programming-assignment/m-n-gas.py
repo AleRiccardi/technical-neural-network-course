@@ -1,34 +1,65 @@
 import numpy as np
 import random
+from matplotlib import pyplot as plt
+
+
+def euclidian_distance(a, b):
+    return np.linalg.norm(a - b)
 
 
 class NeuralGas:
 
-    def __init__(self):
+    def __init__(self, num_patterns, centers, min_l_rate=0.01, max_l_rate=0.1, epochs=50):
         self.rank_dist = []
+        self.centers = centers
+        self.min_l_rate = min_l_rate
+        self.max_l_rate = max_l_rate
+        self.num_patterns = num_patterns
+        self.epochs = epochs
 
-    def fit(self, pattern):
-        pass
+    def fit(self, pattern, epoch, t):
+        for pos, rank_c in enumerate(self.rank_dist):
+            center = self.centers[rank_c[0], :]
+            sub = (pattern - center)
+            neigh_funct = self.neighbourhood(pos, epoch)
+            learn_rate = self.learning_rate(t)
+            delta_vector = learn_rate * neigh_funct * sub
+            self.centers[rank_c[0], :] += delta_vector
 
-    def confirm_fit(self):
-        pass
+    def closest_distance(self):
+        return self.rank_dist[1]
 
-    def get_shortest_dist(self):
-        pass
+    def compute_distances(self, x):
+        self.rank_dist = []
+        for c in range(self.centers.shape[0]):
+            # append a tuple of (number of neuron, distance)
+            # to the ranked list
+            dist = euclidian_distance(self.centers[c, :], x)
+            self.rank_dist.append((c, dist))
+        # actually rank the distances
+        self.rank_dist.sort(key=lambda tup: tup[1])
 
-    def neighbour_func(self):
-        pass
+    def neighbourhood(self, pos, epoch, sigma=0.5):
+        norm_pos = pos / self.centers.shape[0]
+        num = 1 / (np.sqrt(2 * np.pi) * sigma)
+        den = np.exp(norm_pos ** 2 / (2 * sigma ** 2))
+        t = ((self.epochs - epoch) - 0.25) / (self.epochs - 0.25)
+        return num * den * t
 
-    def learning_rate(self):
-        pass
+    def learning_rate(self, t):
+        # get num_patterns from looping code every time
+        # universal for training and validation
+        t_norm = t / self.num_patterns
+        l_rate = np.exp(-10 * t_norm)
+        return self.max_l_rate * (self.min_l_rate / self.max_l_rate) ** l_rate
 
 
 class MNGas:
 
-    def __init__(self, num_nets, k_range, X_train):
+    def __init__(self, num_nets, k_range, X_train, epochs=50):
         """
         Initialization.
-        :param m_nets: number of networks.
+        :param num_nets: number of networks.
         :param k_range: tuple (pair) of values that specify the
         range of neurons that can be chosen randomly for each network.
         :param X_train: 2D numpy training data, the axis=0 specify the patterns
@@ -39,13 +70,15 @@ class MNGas:
         self.num_patterns = X_train.shape[0]
         self.num_features = X_train.shape[1]
         self.X_train = X_train
+        self.epochs = epochs
         self.gasses = self.init_gasses()
+        self.plot_centers(X_train)
 
     def init_gasses(self):
         gasses = []
         m_centers = self.generate_nets_centers()
         for m in range(self.m_nets):
-            gasses.append(NeuralGas(self.num_patterns, m_centers[m]))
+            gasses.append(NeuralGas(self.num_patterns, m_centers[m], 0.01, 0.1, self.epochs))
         return gasses
 
     def generate_nets_centers(self):
@@ -68,23 +101,44 @@ class MNGas:
 
         return m_centers
 
-    def fit(self, X_train):
-        for x in range(X_train.shape[0]):
-            pattern = X_train[x, :]
-            # (dist, num_net)
-            closest_net = (-1, None)
-            for m in range(self.m_nets):
-                self.gasses[m].compute_distances(pattern)
-                dist = self.gasses[m].closest_distance()
-                if closest_net[0] == -1:
-                    closest_net = (dist, m)
-                if dist < closest_net[0]:
-                    closest_net = (dist, m)
+    def fit(self):
+        for epoch in range(self.epochs):
+            print('Epoch: {}/{}'.format(epoch + 1, self.epochs))
+            interval = self.num_patterns / 6
 
-            # get num of the closest net
-            num_net = closest_net[1]
-            # fit the closest net
-            self.m_nets[num_net].fit(pattern, x)
+            for x in range(self.X_train.shape[0]):
+                idx_net = self.get_closest_net(x)
+                self.gasses[idx_net].fit(self.X_train[x], epoch, x)
+
+                if x >= interval:
+                    # if True:
+                    interval += x
+                    self.plot_centers(self.X_train)
+
+    def get_closest_net(self, x):
+        pattern = self.X_train[x, :]
+        # (dist, num_net)
+        closest_net = (-1, None)
+        for m in range(self.m_nets):
+            self.gasses[m].compute_distances(pattern)
+            dist = self.gasses[m].closest_distance()
+            if closest_net[0] == -1:
+                closest_net = (dist, m)
+            if dist < closest_net[0]:
+                closest_net = (dist, m)
+            if dist == 0:
+                print('hopppla')
+
+        # get idx of the closest net
+        return closest_net[1]
+
+    def plot_centers(self, X):
+        points = ['r.', 'g.', 'b.', 'm.']
+        plt.plot(X[:, 0], X[:, 1], 'k.', linewidth=1)
+        for m in range(self.m_nets):
+            centers = self.gasses[m].centers
+            plt.plot(centers[:, 0], centers[:, 1], points[m], label='line 1', linewidth=2)
+        plt.show()
 
 
 def read_dat(name):
@@ -135,7 +189,7 @@ def generate_3_areas():
     return None
 
 
-
 if __name__ == '__main__':
     X, _ = read_dat('PA-D-train.dat.txt')
-    m_gas = MNGas(4, (50, 100), X)
+    m_gas = MNGas(4, (100, 200), X, epochs=50)
+    m_gas.fit()

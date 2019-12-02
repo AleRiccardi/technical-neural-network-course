@@ -244,7 +244,7 @@ if __name__ == "__main__":
     X_train, y_train, X_val, y_val = train_test_split(X, y, split=.8)
 
     # initialize the network
-    net = Network(num_rbf=50, epochs=100, seed=10)
+    net = Network(num_rbf=100, epochs=60, seed=7)
     # train and validate each epoch
     net.fit(X_train, y_train, X_val, y_val)
 
