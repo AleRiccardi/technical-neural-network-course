@@ -18,6 +18,13 @@ class NeuralGas:
         self.epochs = epochs
 
     def fit(self, pattern, epoch, t):
+        """
+        Fitting of the neural gas.
+        :param pattern:
+        :param epoch:
+        :param t:
+        :return:
+        """
         for pos, rank_c in enumerate(self.rank_dist):
             center = self.centers[rank_c[0], :]
             sub = (pattern - center)
@@ -26,20 +33,39 @@ class NeuralGas:
             delta_vector = learn_rate * neigh_funct * sub
             self.centers[rank_c[0], :] += delta_vector
 
-    def closest_distance(self):
+    def get_closest_distance(self):
+        """
+        Get the closes distance after having
+        executed compute_distances func.
+        :return:
+        """
         return self.rank_dist[1]
 
-    def compute_distances(self, x):
+    def compute_distances(self, pattern):
+        """
+        Compute distance between all
+        the center given a pattern
+        :param pattern: numpy array.
+        """
         self.rank_dist = []
         for c in range(self.centers.shape[0]):
             # append a tuple of (number of neuron, distance)
             # to the ranked list
-            dist = euclidian_distance(self.centers[c, :], x)
+            dist = euclidian_distance(self.centers[c, :], pattern)
             self.rank_dist.append((c, dist))
         # actually rank the distances
         self.rank_dist.sort(key=lambda tup: tup[1])
 
     def neighbourhood(self, pos, epoch, sigma=0.5):
+        """
+        Neighbourhood function.
+        :param pos: position of the center in the
+        ranking array.
+        :param epoch: number of epoch.
+        :param sigma: sigma value of the gaussian
+        neighbourhood function
+        :return: the value of the function
+        """
         norm_pos = pos / self.centers.shape[0]
         num = 1 / (np.sqrt(2 * np.pi) * sigma)
         den = np.exp(norm_pos ** 2 / (2 * sigma ** 2))
@@ -47,6 +73,11 @@ class NeuralGas:
         return num * den * t
 
     def learning_rate(self, t):
+        """
+        Learning rate.
+        :param t:
+        :return:
+        """
         # get num_patterns from looping code every time
         # universal for training and validation
         t_norm = t / self.num_patterns
@@ -121,7 +152,7 @@ class MNGas:
         closest_net = (-1, None)
         for m in range(self.m_nets):
             self.gasses[m].compute_distances(pattern)
-            dist = self.gasses[m].closest_distance()
+            dist = self.gasses[m].get_closest_distance()
             if closest_net[0] == -1:
                 closest_net = (dist, m)
             if dist < closest_net[0]:
