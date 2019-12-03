@@ -3,7 +3,7 @@ import random
 from matplotlib import pyplot as plt
 
 
-def euclidian_distance(a, b):
+def euclidean_distance(a, b):
     return np.linalg.norm(a - b)
 
 
@@ -27,10 +27,9 @@ class NeuralGas:
         """
         for pos, rank_c in enumerate(self.rank_dist):
             center = self.centers[rank_c[0], :]
-            sub = (pattern - center)
             neigh_funct = self.neighbourhood(pos, epoch)
             learn_rate = self.learning_rate(t)
-            delta_vector = learn_rate * neigh_funct * sub
+            delta_vector = learn_rate * neigh_funct * (pattern - center)
             self.centers[rank_c[0], :] += delta_vector
 
     def get_closest_distance(self):
@@ -51,12 +50,12 @@ class NeuralGas:
         for c in range(self.centers.shape[0]):
             # append a tuple of (number of neuron, distance)
             # to the ranked list
-            dist = euclidian_distance(self.centers[c, :], pattern)
+            dist = euclidean_distance(self.centers[c, :], pattern)
             self.rank_dist.append((c, dist))
         # actually rank the distances
         self.rank_dist.sort(key=lambda tup: tup[1])
 
-    def neighbourhood(self, pos, epoch, sigma=0.5):
+    def neighbourhood(self, pos, epoch):
         """
         Neighbourhood function.
         :param pos: position of the center in the
@@ -66,11 +65,14 @@ class NeuralGas:
         neighbourhood function
         :return: the value of the function
         """
+        norm_epoch = (1 - (epoch / self.epochs))
+        norm_epoch = norm_epoch * 25 + 25
+        sigma = (norm_epoch - 25) / (50 - 25)
         norm_pos = pos / self.centers.shape[0]
         num = 1 / (np.sqrt(2 * np.pi) * sigma)
         den = np.exp(norm_pos ** 2 / (2 * sigma ** 2))
-        t = ((self.epochs - epoch) - 0.25) / (self.epochs - 0.25)
-        return num * den * t
+        gaus = num * den
+        return gaus
 
     def learning_rate(self, t):
         """
@@ -140,7 +142,6 @@ class MNGas:
             for x in range(self.X_train.shape[0]):
                 idx_net = self.get_closest_net(x)
                 self.gasses[idx_net].fit(self.X_train[x], epoch, x)
-
                 if x >= interval:
                     # if True:
                     interval += x
@@ -202,25 +203,69 @@ def read_dat(name):
     return X, y
 
 
-def generate_2_areas():
+def generate_2_areas(num_patterns, num_dimensions, radius=0.1):
     """
     Generate 2 circular non overlapping areas.
     :return:
     """
-    # return X patterns
-    return None
+    i = 0
+    patterns = []
+    while i < num_patterns:
+        pattern1 = []
+        for j in range(num_dimensions):
+            pattern1.append(0.33 + random.uniform(-radius, radius))
+        patterns.append(pattern1)
+        i += 1
+
+        if i == num_patterns:
+            break
+
+        pattern2 = []
+        for j in range(num_dimensions):
+            pattern2.append(0.66 + random.uniform(-radius, radius))
+        patterns.append(pattern2)
+        i += 1
+    pat_np = np.array(patterns)
+    return pat_np
 
 
-def generate_3_areas():
+def generate_3_areas(num_patterns, num_dimensions, radius=0.1):
     """
     Generate 3 circular non overlapping areas.
     :return:
     """
-    # return X patterns
-    return None
+    i = 0
+    patterns = []
+    while i < num_patterns:
+        pattern1 = []
+        for j in range(num_dimensions):
+            pattern1.append(0.25 + random.uniform(-radius, radius))
+        patterns.append(pattern1)
+        i += 1
+
+        if i == num_patterns:
+            break
+
+        pattern2 = []
+        for j in range(num_dimensions):
+            pattern2.append(0.5 + random.uniform(-radius, radius))
+        patterns.append(pattern2)
+        i += 1
+
+        if i == num_patterns:
+            break
+
+        pattern3 = []
+        for j in range(num_dimensions):
+            pattern3.append(0.75 + random.uniform(-radius, radius))
+        patterns.append(pattern3)
+        i += 1
+    pat_np = np.array(patterns)
+    return pat_np
 
 
 if __name__ == '__main__':
     X, _ = read_dat('PA-D-train.dat.txt')
+    X = generate_2_areas(1000, 2)
     m_gas = MNGas(4, (100, 200), X, epochs=50)
     m_gas.fit()
