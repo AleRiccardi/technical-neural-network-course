@@ -70,7 +70,7 @@ class HopfieldNet:
             np.fill_diagonal(matrix_lr, 0)
             self.weights += matrix_lr
 
-    def predict(self, X, show_energy=False):
+    def predict(self, X, show_energy=False, show_char=False):
         num_k = X.shape[1]
         X_pred = X.copy()
 
@@ -86,6 +86,9 @@ class HopfieldNet:
                 # print energy
                 if show_energy:
                     self.print_energy(X_pred[p], p, time_s)
+                # print char
+                if show_char and num_k <= 100:
+                    self.print_char(X_pred[p], p, time_s)
 
                 # loop per every neuron
                 for k in range(num_k):
@@ -115,19 +118,20 @@ class HopfieldNet:
         print('Pattern: {}\t||\tTime stamp: {}\t||\tEnergy: {:7.0f}'.format(num_p, time_s, energy))
         return energy
 
+    def print_char(self, sequence, num_p, time_s):
+        sqrtK = np.sqrt(sequence.shape[0])
+        # check if correct sequence
+        assert sqrtK % 1 == 0
 
-def print_char(sequence):
-    l = np.sqrt(sequence.shape[0])
-    # check if correct sequence
-    assert l % 1 == 0
+        print('Pattern: {}\t||\tTime stamp: {}'.format(num_p, time_s))
 
-    for y in range(int(l)):
-        for x in range(int(l)):
-            idx = int(y * l + x)
-            val = '*' if sequence[idx] > 0 else ' '
-            print(val, end=' ')
+        for y in range(int(sqrtK)):
+            for x in range(int(sqrtK)):
+                idx = int(y * sqrtK + x)
+                val = '*' if sequence[idx] > 0 else ' '
+                print(val, end=' ')
+            print('', sep='', end='\n')
         print('', sep='', end='\n')
-    print('', sep='', end='\n')
 
 
 def test_w_less_101():
@@ -150,15 +154,7 @@ def test_w_less_101():
     ])
     X_test = np.where(X_test > 0, 1, -1)
 
-    X_out = net.predict(X_test)
-
-    if X.shape[1] <= 100:
-        for p in range(X_out.shape[0]):
-            print('Test: {}'.format(p + 1))
-            print('(Noisy)')
-            print_char(X_test[p, :])
-            print('(Corrected)')
-            print_char(X_out[p, :])
+    _ = net.predict(X_test, show_char=True)
 
 
 def test_w_more_100():
@@ -189,7 +185,7 @@ def test_w_more_100():
     ])
     X_test = np.where(X_test > 0, 1, -1)
 
-    X_out = net.predict(X_test, True)
+    _ = net.predict(X_test, show_energy=True)
 
 
 if __name__ == '__main__':
